@@ -1709,269 +1709,6 @@ def replaceInternalLinks(text):
     return res + text[cur:]
 
 
-# the official version is a method in class Parser, similar to this:
-# def replaceInternalLinks2(text):
-#     global wgExtraInterlanguageLinkPrefixes
-
-#     # the % is needed to support urlencoded titles as well
-#     tc = Title::legalChars() + '#%'
-#     # Match a link having the form [[namespace:link|alternate]]trail
-#     e1 = re.compile("([%s]+)(?:\\|(.+?))?]](.*)" % tc, re.S | re.D)
-#     # Match cases where there is no "]]", which might still be images
-#     e1_img = re.compile("([%s]+)\\|(.*)" % tc, re.S | re.D)
-
-#     holders = LinkHolderArray(self)
-
-#     # split the entire text string on occurrences of [[
-#     iterBrackets = re.compile('[[').finditer(text)
-
-#     m in iterBrackets.next()
-#     # get the first element (all text up to first [[)
-#     s = text[:m.start()]
-#     cur = m.end()
-
-#     line = s
-
-#     useLinkPrefixExtension = self.getTargetLanguage().linkPrefixExtension()
-#     e2 = None
-#     if useLinkPrefixExtension:
-#         # Match the end of a line for a word that is not followed by whitespace,
-#         # e.g. in the case of "The Arab al[[Razi]]",  "al" will be matched
-#         global wgContLang
-#         charset = wgContLang.linkPrefixCharset()
-#         e2 = re.compile("((?>.*[^charset]|))(.+)", re.S | re.D | re.U)
-
-#     if self.mTitle is None:
-#         raise MWException(__METHOD__ + ": \self.mTitle is null\n")
-
-#     nottalk = not self.mTitle.isTalkPage()
-
-#     if useLinkPrefixExtension:
-#         m = e2.match(s)
-#         if m:
-#             first_prefix = m.group(2)
-#         else:
-#             first_prefix = false
-#     else:
-#         prefix = ''
-
-#     useSubpages = self.areSubpagesAllowed()
-
-#     for m in iterBrackets:
-#         line = text[cur:m.start()]
-#         cur = m.end()
-
-#         # TODO: Check for excessive memory usage
-
-#         if useLinkPrefixExtension:
-#             m = e2.match(e2)
-#             if m:
-#                 prefix = m.group(2)
-#                 s = m.group(1)
-#             else:
-#                 prefix = ''
-#             # first link
-#             if first_prefix:
-#                 prefix = first_prefix
-#                 first_prefix = False
-
-#         might_be_img = False
-
-#         m = e1.match(line)
-#         if m: # page with normal label or alt
-#             label = m.group(2)
-#             # If we get a ] at the beginning of m.group(3) that means we have a link that is something like:
-#             # [[Image:Foo.jpg|[http://example.com desc]]] <- having three ] in a row fucks up,
-#             # the real problem is with the e1 regex
-#             # See bug 1300.
-#             #
-#             # Still some problems for cases where the ] is meant to be outside punctuation,
-#             # and no image is in sight. See bug 2095.
-#             #
-#             if label and m.group(3)[0] == ']' and '[' in label:
-#                 label += ']' # so that replaceExternalLinks(label) works later
-#                 m.group(3) = m.group(3)[1:]
-#             # fix up urlencoded title texts
-#             if '%' in m.group(1):
-#                 # Should anchors '#' also be rejected?
-#                 m.group(1) = str_replace(array('<', '>'), array('&lt', '&gt'), rawurldecode(m.group(1)))
-#             trail = m.group(3)
-#         else:
-#             m = e1_img.match(line):
-#             if m:
-#                 # Invalid, but might be an image with a link in its caption
-#                 might_be_img = true
-#                 label = m.group(2)
-#                 if '%' in m.group(1):
-#                     m.group(1) = rawurldecode(m.group(1))
-#                 trail = ""
-#             else:		# Invalid form; output directly
-#                 s += prefix + '[[' + line
-#                 continue
-
-#         origLink = m.group(1)
-
-#         # Dont allow internal links to pages containing
-#         # PROTO: where PROTO is a valid URL protocol these
-#         # should be external links.
-#         if (preg_match('/^(?i:' + self.mUrlProtocols + ')/', origLink)) {
-#             s += prefix + '[[' + line
-#             continue
-#         }
-
-#         # Make subpage if necessary
-#         if useSubpages:
-#             link = self.maybeDoSubpageLink(origLink, label)
-#         else:
-#             link = origLink
-
-#         noforce = origLink[0] != ':'
-#         if not noforce:
-#             # Strip off leading ':'
-#             link = link[1:]
-
-#         nt = Title::newFromText(self.mStripState.unstripNoWiki(link))
-#         if nt is None:
-#             s += prefix + '[[' + line
-#             continue
-
-#         ns = nt.getNamespace()
-#         iw = nt.getInterwiki()
-
-#         if might_be_img {	# if this is actually an invalid link
-#             if (ns == NS_FILE and noforce) { # but might be an image
-#                 found = False
-#                 while True:
-#                     # look at the next 'line' to see if we can close it there
-#                     next_line = iterBrakets.next()
-#                     if not next_line:
-#                         break
-#                     m = explode(']]', next_line, 3)
-#                     if m.lastindex == 3:
-#                         # the first ]] closes the inner link, the second the image
-#                         found = True
-#                         label += "[[%s]]%s" % (m.group(0), m.group(1))
-#                         trail = m.group(2)
-#                         break
-#                     elif m.lastindex == 2:
-#                         # if there is exactly one ]] that is fine, we will keep looking
-#                         label += "[[{m[0]}]]{m.group(1)}"
-#                     else:
-#                         # if next_line is invalid too, we need look no further
-#                         label += '[[' + next_line
-#                         break
-#                 if not found:
-#                     # we couldnt find the end of this imageLink, so output it raw
-#                     # but dont ignore what might be perfectly normal links in the text we ve examined
-#                     holders.merge(self.replaceInternalLinks2(label))
-#                     s += "{prefix}[[%s|%s" % (link, text)
-#                     # note: no trail, because without an end, there *is* no trail
-#                     continue
-#             } else: # it is not an image, so output it raw
-#                 s += "{prefix}[[%s|%s" % (link, text)
-#                 # note: no trail, because without an end, there *is* no trail
-#                      continue
-#         }
-
-#         wasblank = (text == '')
-#         if wasblank:
-#             text = link
-#         else:
-#             # Bug 4598 madness.  Handle the quotes only if they come from the alternate part
-#             # [[Lista d''e paise d''o munno]] . <a href="...">Lista d''e paise d''o munno</a>
-#             # [[Criticism of Harry Potter|Criticism of ''Harry Potter'']]
-#             #    . <a href="Criticism of Harry Potter">Criticism of <i>Harry Potter</i></a>
-#             text = self.doQuotes(text)
-
-#         # Link not escaped by : , create the various objects
-#         if noforce and not nt.wasLocalInterwiki():
-#             # Interwikis
-#             if iw and mOptions.getInterwikiMagic() and nottalk and (
-#                     Language::fetchLanguageName(iw, None, 'mw') or
-#                     in_array(iw, wgExtraInterlanguageLinkPrefixes)):
-#                 # Bug 24502: filter duplicates
-#                 if iw not in mLangLinkLanguages:
-#                     self.mLangLinkLanguages[iw] = True
-#                     self.mOutput.addLanguageLink(nt.getFullText())
-
-#                 s = rstrip(s + prefix)
-#                 s += strip(trail, "\n") == '' ? '': prefix + trail
-#                 continue
-
-#             if ns == NS_FILE:
-#                 if not wfIsBadImage(nt.getDBkey(), self.mTitle):
-#                     if wasblank:
-#                         # if no parameters were passed, text
-#                         # becomes something like "File:Foo.png",
-#                         # which we dont want to pass on to the
-#                         # image generator
-#                         text = ''
-#                     else:
-#                         # recursively parse links inside the image caption
-#                         # actually, this will parse them in any other parameters, too,
-#                         # but it might be hard to fix that, and it doesnt matter ATM
-#                         text = self.replaceExternalLinks(text)
-#                         holders.merge(self.replaceInternalLinks2(text))
-#                     # cloak any absolute URLs inside the image markup, so replaceExternalLinks() wont touch them
-#                     s += prefix + self.armorLinks(
-#                         self.makeImage(nt, text, holders)) + trail
-#                 else:
-#                     s += prefix + trail
-#                 continue
-
-#             if ns == NS_CATEGORY:
-#                 s = rstrip(s + "\n") # bug 87
-
-#                 if wasblank:
-#                     sortkey = self.getDefaultSort()
-#                 else:
-#                     sortkey = text
-#                 sortkey = Sanitizer::decodeCharReferences(sortkey)
-#                 sortkey = str_replace("\n", '', sortkey)
-#                 sortkey = self.getConverterLanguage().convertCategoryKey(sortkey)
-#                 self.mOutput.addCategory(nt.getDBkey(), sortkey)
-
-#                 s += strip(prefix + trail, "\n") == '' ? '' : prefix + trail
-
-#                 continue
-#             }
-#         }
-
-#         # Self-link checking. For some languages, variants of the title are checked in
-#         # LinkHolderArray::doVariants() to allow batching the existence checks necessary
-#         # for linking to a different variant.
-#         if ns != NS_SPECIAL and nt.equals(self.mTitle) and !nt.hasFragment():
-#             s += prefix + Linker::makeSelfLinkObj(nt, text, '', trail)
-#                  continue
-
-#         # NS_MEDIA is a pseudo-namespace for linking directly to a file
-#         # @todo FIXME: Should do batch file existence checks, see comment below
-#         if ns == NS_MEDIA:
-#             # Give extensions a chance to select the file revision for us
-#             options = []
-#             descQuery = False
-#             Hooks::run('BeforeParserFetchFileAndTitle',
-#                        [this, nt, &options, &descQuery])
-#             # Fetch and register the file (file title may be different via hooks)
-#             file, nt = self.fetchFileAndTitle(nt, options)
-#             # Cloak with NOPARSE to avoid replacement in replaceExternalLinks
-#             s += prefix + self.armorLinks(
-#                 Linker::makeMediaLinkFile(nt, file, text)) + trail
-#             continue
-
-#         # Some titles, such as valid special pages or files in foreign repos, should
-#         # be shown as bluelinks even though they are not included in the page table
-#         #
-#         # @todo FIXME: isAlwaysKnown() can be expensive for file links; we should really do
-#         # batch file existence checks for NS_FILE and NS_MEDIA
-#         if iw == '' and nt.isAlwaysKnown():
-#             self.mOutput.addLink(nt)
-#             s += self.makeKnownLinkHolder(nt, text, array(), trail, prefix)
-#         else:
-#             # Links will be added to the output link list after checking
-#             s += holders.makeHolder(nt, text, array(), trail, prefix)
-#     }
-#     return holders
 
 
 def makeInternalLink(title, label):
@@ -2418,7 +2155,7 @@ def process_dump(input_file, template_file, out_file, file_size, file_compress,
 
     # collect siteinfo
     for line in input:
-        line = line.decode('utf-8')
+        line = line.decode("utf-8")
         m = tagRE.search(line)
         if not m:
             continue
@@ -2438,6 +2175,13 @@ def process_dump(input_file, template_file, out_file, file_size, file_compress,
                 modulePrefix = moduleNamespace + ':'
         elif tag == '/siteinfo':
             break
+
+    print(templatePrefix)
+    print(templateNamespace)
+    print(moduleNamespace)
+    print(modulePrefix)
+    import sys
+    sys.exit(0)
 
     if Extractor.expand_templates:
         # preprocess
@@ -2529,11 +2273,10 @@ def process_dump(input_file, template_file, out_file, file_size, file_compress,
                 page = None  # free memory
                 e.extract(out)
                 text = out.getvalue()
-                print(text)
             except:
                 text = ''
             out.truncate(0)
-            
+
             # jobs_queue.put(job)  # goes to any available extract_process
             page_num += 1
         page = None  # free memory
