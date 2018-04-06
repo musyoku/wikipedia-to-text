@@ -1,65 +1,57 @@
-import re
+import re, os
 import argparse
 import fileinput
 import urllib
+import codecs
 
 import regex
 import collection
 import functions
 
-knownNamespaces = set(['Template'])
-templateKeys = set(['10', '828'])
-
-urlbase = ""
-
-
-def get_url(uid):
-    return "%s?curid=%s" % (urlbase, uid)
-
 
 def main():
-    global urlbase
-    f = fileinput.FileInput(args.input, openhook=fileinput.hook_compressed)
-    for line in f:
-        line = line.decode("utf-8")
-        m = regex.tags.search(line)
-        if not m:
-            continue
-        tag = m.group(2)
-        if tag == 'base':
-            base = m.group(3)
-            urlbase = base[:base.rfind("/")]
-        elif tag == 'namespace':
-            # knownNamespaces.add(m.group(3))
-            if re.search('key="10"', line):
-                templateNamespace = m.group(3)
-                templatePrefix = templateNamespace + ':'
-            elif re.search('key="828"', line):
-                moduleNamespace = m.group(3)
-                modulePrefix = moduleNamespace + ':'
-        elif tag == '/siteinfo':
-            break
+    try:
+        os.mkdir(args.output_directory)
+    except:
+        pass
 
-    for (id, title, ns, page) in functions.pages_from(f):
-        if ns not in templateKeys:
-            url = get_url(id)
-            text = ''.join(page)
-            text = functions.clean(text)
-            paragraphs = []
-            for line in functions.compact(text):
-                paragraphs.append(line)
-            print(title)
-            print("".join(paragraphs))
+    file = fileinput.FileInput(args.input, openhook=fileinput.hook_compressed)
+    for (id, title, namespace, raw_line_array) in functions.pages_from(file):
+        if namespace == "0":
+            raw_text = "".join(raw_line_array)
+            raw_text = functions.clean(raw_text)
+            paragraph_array = []
+            for line in functions.compact(raw_text):
+                paragraph_array.append(line)
+            paragraphs_str = "".join(paragraph_array)
+            # 日本語の文章かどうかをチェック
+            if paragraphs_str.find("。") == -1:
+                continue
+            sentence_array = paragraphs_str.split("。")
+            if(len(sentence_array) < args.minimum_num_sentences):
+                continue
+            print(len(sentence_array))
+            with codecs.open(
+                    os.path.join(args.output_directory, title + ".txt"), "w",
+                    "utf-8") as f:
+                f.write("。\n".join(sentence_array))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # 以下のどちらかを必ず指定
     parser.add_argument(
         "-i",
         "--input",
         type=str,
         required=True,
         help="jawiki-latest-pages-articles.xml.bz2のパスを指定")
+    parser.add_argument(
+        "-o", "--output-directory", type=str, required=True, help="出力ディレクトリ")
+    parser.add_argument(
+        "-n",
+        "--minimum-num-sentences",
+        type=str,
+        default=80,
+        help="これ未満の文量の記事はファイルにしない")
     args = parser.parse_args()
     main()
