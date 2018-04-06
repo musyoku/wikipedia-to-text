@@ -9,7 +9,7 @@ tags_ignored = ('abbr', 'b', 'big', 'blockquote', 'center', 'cite', 'em',
                 'p', 'plaintext', 's', 'span', 'strike', 'strong', 'tt', 'u',
                 'var')
 
-discardElements = [
+discard_elements = [
     'gallery', 'timeline', 'noinclude', 'pre', 'table', 'tr', 'td', 'th',
     'caption', 'div', 'form', 'input', 'select', 'option', 'textarea', 'ul',
     'li', 'ol', 'dl', 'dt', 'dd', 'menu', 'dir', 'ref', 'references', 'img',
