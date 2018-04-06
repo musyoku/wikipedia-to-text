@@ -7,9 +7,15 @@ url_protocols = [
     'svn://', 'tel:', 'telnet://', 'urn:', 'worldwind://', 'xmpp:', '//'
 ]
 
-image = re.compile(r"""^(http://|https://)([^][<>"\x00-\x20\x7F\s]+)
-    /([A-Za-z0-9_.,~%\-+&;#*?!=()@\x80-\xFF]+)\.((?i)gif|png|jpg|jpeg)$""",
-                             re.X | re.S | re.U)
+placeholder_tags = {'math': 'formula', 'code': 'codice'}
+placeholder_tag_patterns = [(re.compile(
+    r'<\s*%s(\s*| [^>]+?)>.*?<\s*/\s*%s\s*>' % (tag, tag),
+    re.DOTALL | re.IGNORECASE), repl)
+                            for tag, repl in placeholder_tags.items()]
+
+image = re.compile(
+    r"""^(http://|https://)([^][<>"\x00-\x20\x7F\s]+)    /([A-Za-z0-9_.,~%\-+&;#*?!=()@\x80-\xFF]+)\.((?i)gif|png|jpg|jpeg)$""",
+    re.X | re.S | re.U)
 link_url_class = r'[^][<>"\x00-\x20\x7F\s]'
 anchor_class = r'[^][\x00-\x08\x0a-\x1F]'
 link_brackets = re.compile(
@@ -27,3 +33,7 @@ quote_quote = re.compile(r'""([^"]*?)""')
 comment = re.compile(r'<!--.*?-->', re.DOTALL)
 spaces = re.compile(r' {2,}')
 dots = re.compile(r'\.{4,}')
+tags = re.compile(r'(.*?)<(/?\w+)[^>]*>(?:([^<]*)(<.*?>)?)?')
+
+syntaxhighlight = re.compile(
+    '&lt;syntaxhighlight .*?&gt;(.*?)&lt;/syntaxhighlight&gt;', re.DOTALL)

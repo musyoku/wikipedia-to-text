@@ -6,68 +6,30 @@ from itertools import zip_longest
 from html.entities import name2codepoint
 
 import regex
+import collection
 
-regex.tags = re.compile(r'(.*?)<(/?\w+)[^>]*>(?:([^<]*)(<.*?>)?)?')
 knownNamespaces = set(['Template'])
 templateKeys = set(['10', '828'])
 
 urlbase = ""
 
-placeholder_tags = {'math': 'formula', 'code': 'codice'}
-placeholder_tag_patterns = [(re.compile(
-    r'<\s*%s(\s*| [^>]+?)>.*?<\s*/\s*%s\s*>' % (tag, tag),
-    re.DOTALL | re.IGNORECASE), repl)
-                            for tag, repl in placeholder_tags.items()]
-
-tags_self_closing = ('br', 'hr', 'nobr', 'ref', 'references', 'nowiki')
-
-# These tags are dropped, keeping their content.
-# handle 'a' separately, depending on keepLinks
-tags_ignored = ('abbr', 'b', 'big', 'blockquote', 'center', 'cite', 'em',
-                'font', 'h1', 'h2', 'h3', 'h4', 'hiero', 'i', 'kbd', 'nowiki',
-                'p', 'plaintext', 's', 'span', 'strike', 'strong', 'tt', 'u',
-                'var')
-
-discardElements = [
-    'gallery', 'timeline', 'noinclude', 'pre', 'table', 'tr', 'td', 'th',
-    'caption', 'div', 'form', 'input', 'select', 'option', 'textarea', 'ul',
-    'li', 'ol', 'dl', 'dt', 'dd', 'menu', 'dir', 'ref', 'references', 'img',
-    'imagemap', 'source', 'small', 'sub', 'sup'
+self_closing_tags = [
+    re.compile(r'<\s*%s\b[^>]*/\s*>' % tag, re.DOTALL | re.IGNORECASE)
+    for tag in collection.tags_self_closing
 ]
-
-ignored_tag_patterns = []
-acceptedNamespaces = ['w', 'wiktionary', 'wikt']
 
 
 def makeInternalLink(title, label):
     colon = title.find(':')
-    if colon > 0 and title[:colon] not in acceptedNamespaces:
+    if colon > 0 and title[:colon] not in collection.acceptedNamespaces:
         return ''
     if colon == 0:
         # drop also :File:
         colon2 = title.find(':', colon + 1)
-        if colon2 > 1 and title[colon + 1:colon2] not in acceptedNamespaces:
+        if colon2 > 1 and title[colon + 1:
+                                colon2] not in collection.acceptedNamespaces:
             return ''
     return label
-
-
-def ignoreTag(tag):
-    left = re.compile(r'<%s\b.*?>' % tag,
-                      re.IGNORECASE | re.DOTALL)  # both <ref> and <reference>
-    right = re.compile(r'</\s*%s>' % tag, re.IGNORECASE)
-    ignored_tag_patterns.append((left, right))
-
-
-for tag in tags_ignored:
-    ignoreTag(tag)
-
-regex.self_closing_tags = [
-    re.compile(r'<\s*%s\b[^>]*/\s*>' % tag, re.DOTALL | re.IGNORECASE)
-    for tag in tags_self_closing
-]
-
-regex.syntaxhighlight = re.compile(
-    '&lt;syntaxhighlight .*?&gt;(.*?)&lt;/syntaxhighlight&gt;', re.DOTALL)
 
 
 class MagicWords(object):
@@ -407,12 +369,12 @@ def clean(text):
         spans.append((m.start(), m.end()))
 
     # Drop self-closing tags
-    for pattern in regex.self_closing_tags:
+    for pattern in self_closing_tags:
         for m in pattern.finditer(text):
             spans.append((m.start(), m.end()))
 
     # Drop ignored tags
-    for left, right in ignored_tag_patterns:
+    for left, right in collection.ignored_tag_patterns:
         for m in left.finditer(text):
             spans.append((m.start(), m.end()))
         for m in right.finditer(text):
@@ -422,13 +384,13 @@ def clean(text):
     text = dropSpans(spans, text)
 
     # Drop discarded elements
-    for tag in discardElements:
+    for tag in collection.discardElements:
         text = dropNested(text, r'<\s*%s\b[^>/]*>' % tag, r'<\s*/\s*%s>' % tag)
 
     text = unescape(text)
 
     # Expand placeholders
-    for pattern, placeholder in placeholder_tag_patterns:
+    for pattern, placeholder in regex.placeholder_tag_patterns:
         index = 1
         for match in pattern.finditer(text):
             text = text.replace(match.group(), '%s_%d' % (placeholder, index))
