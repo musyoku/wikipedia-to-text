@@ -5,38 +5,13 @@ import urllib
 from itertools import zip_longest
 from html.entities import name2codepoint
 
-regex_tags = re.compile(r'(.*?)<(/?\w+)[^>]*>(?:([^<]*)(<.*?>)?)?')
+import regex
+
+regex.tags = re.compile(r'(.*?)<(/?\w+)[^>]*>(?:([^<]*)(<.*?>)?)?')
 knownNamespaces = set(['Template'])
 templateKeys = set(['10', '828'])
 
 urlbase = ""
-
-wgUrlProtocols = [
-    'bitcoin:', 'ftp://', 'ftps://', 'geo:', 'git://', 'gopher://', 'http://',
-    'https://', 'irc://', 'ircs://', 'magnet:', 'mailto:', 'mms://', 'news:',
-    'nntp://', 'redis://', 'sftp://', 'sip:', 'sips:', 'sms:', 'ssh://',
-    'svn://', 'tel:', 'telnet://', 'urn:', 'worldwind://', 'xmpp:', '//'
-]
-EXT_IMAGE_REGEX = re.compile(r"""^(http://|https://)([^][<>"\x00-\x20\x7F\s]+)
-    /([A-Za-z0-9_.,~%\-+&;#*?!=()@\x80-\xFF]+)\.((?i)gif|png|jpg|jpeg)$""",
-                             re.X | re.S | re.U)
-EXT_LINK_URL_CLASS = r'[^][<>"\x00-\x20\x7F\s]'
-ANCHOR_CLASS = r'[^][\x00-\x08\x0a-\x1F]'
-regex_link_brackets = re.compile(
-    '\[(((?i)' + '|'.join(wgUrlProtocols) + ')' + EXT_LINK_URL_CLASS + r'+)' +
-    r'\s*((?:' + ANCHOR_CLASS + r'|\[\[' + ANCHOR_CLASS + r'+\]\])' + r'*?)\]',
-    re.S | re.U)
-
-regex_section = re.compile(r'(==+)\s*(.*?)\s*\1')
-regex_tail = re.compile(r'\w+')
-regex_bold_italic = re.compile(r"'''''(.*?)'''''")
-regex_bold = re.compile(r"'''(.*?)'''")
-regex_italic_quote = re.compile(r"''\"([^\"]*?)\"''")
-regex_italic = re.compile(r"''(.*?)''")
-regex_quote_quote = re.compile(r'""([^"]*?)""')
-regex_comment = re.compile(r'<!--.*?-->', re.DOTALL)
-regex_spaces = re.compile(r' {2,}')
-regex_dots = re.compile(r'\.{4,}')
 
 placeholder_tags = {'math': 'formula', 'code': 'codice'}
 placeholder_tag_patterns = [(re.compile(
@@ -73,8 +48,7 @@ def makeInternalLink(title, label):
         colon2 = title.find(':', colon + 1)
         if colon2 > 1 and title[colon + 1:colon2] not in acceptedNamespaces:
             return ''
-    else:
-        return label
+    return label
 
 
 def ignoreTag(tag):
@@ -87,12 +61,12 @@ def ignoreTag(tag):
 for tag in tags_ignored:
     ignoreTag(tag)
 
-regex_self_closing_tags = [
+regex.self_closing_tags = [
     re.compile(r'<\s*%s\b[^>]*/\s*>' % tag, re.DOTALL | re.IGNORECASE)
     for tag in tags_self_closing
 ]
 
-regex_syntaxhighlight = re.compile(
+regex.syntaxhighlight = re.compile(
     '&lt;syntaxhighlight .*?&gt;(.*?)&lt;/syntaxhighlight&gt;', re.DOTALL)
 
 
@@ -199,7 +173,7 @@ class MagicWords(object):
                 '__DISAMBIG__')
 
 
-regex_magicwords = re.compile('|'.join(MagicWords.switches))
+regex.magicwords = re.compile('|'.join(MagicWords.switches))
 
 
 def get_url(uid):
@@ -219,7 +193,7 @@ def pages_from(input):
             if inText:
                 page.append(line)
             continue
-        m = regex_tags.search(line)
+        m = regex.tags.search(line)
         if not m:
             continue
         tag = m.group(2)
@@ -256,13 +230,6 @@ def pages_from(input):
 
 
 def findBalanced(text, openDelim=['[['], closeDelim=[']]']):
-    """
-    Assuming that text contains a properly balanced expression using
-    :param openDelim: as opening delimiters and
-    :param closeDelim: as closing delimiters.
-    :return: an iterator producing pairs (start, end) of start and end
-    positions in text containing a balanced expression.
-    """
     openPat = '|'.join([re.escape(x) for x in openDelim])
     # pattern for delimiters expected after each opening delimiter
     afterPat = {
@@ -288,7 +255,7 @@ def findBalanced(text, openDelim=['[['], closeDelim=[']]']):
             stack.append(delim)
             nextPat = afterPat[delim]
         else:
-            opening = stack.pop()
+            stack.pop()
             # assert opening == openDelim[closeDelim.index(next.group(0))]
             if stack:
                 nextPat = afterPat[stack[-1]]
@@ -309,12 +276,10 @@ def makeExternalLink(url, anchor):
 
 
 def replaceInternalLinks(text):
-    # call this after removal of external links, so we need not worry about
-    # triple closing ]]].
     cur = 0
     res = ''
     for s, e in findBalanced(text):
-        m = regex_tail.match(text, e)
+        m = regex.tail.match(text, e)
         if m:
             trail = m.group(0)
             end = m.end()
@@ -345,7 +310,7 @@ def replaceInternalLinks(text):
 def replaceExternalLinks(text):
     s = ''
     cur = 0
-    for m in regex_link_brackets.finditer(text):
+    for m in regex.link_brackets.finditer(text):
         s += text[cur:m.start()]
         cur = m.end()
 
@@ -362,7 +327,7 @@ def replaceExternalLinks(text):
 
         # If the link text is an image URL, replace it with an <img> tag
         # This happened by accident in the original parser, but some people used it extensively
-        m = EXT_IMAGE_REGEX.match(label)
+        m = regex.image.match(label)
         if m:
             label = makeExternalImage(label)
 
@@ -413,23 +378,23 @@ def clean(text):
     text = replaceInternalLinks(text)
 
     # drop MagicWords behavioral switches
-    text = regex_magicwords.sub('', text)
+    text = regex.magicwords.sub('', text)
 
     # ############### Process HTML ###############
 
     # turn into HTML, except for the content of <syntaxhighlight>
     res = ''
     cur = 0
-    for m in regex_syntaxhighlight.finditer(text):
+    for m in regex.syntaxhighlight.finditer(text):
         res += unescape(text[cur:m.start()]) + m.group(1)
         cur = m.end()
     text = res + unescape(text[cur:])
 
-    text = regex_bold_italic.sub(r'\1', text)
-    text = regex_bold.sub(r'\1', text)
-    text = regex_italic_quote.sub(r'"\1"', text)
-    text = regex_italic.sub(r'"\1"', text)
-    text = regex_quote_quote.sub(r'"\1"', text)
+    text = regex.bold_italic.sub(r'\1', text)
+    text = regex.bold.sub(r'\1', text)
+    text = regex.italic_quote.sub(r'"\1"', text)
+    text = regex.italic.sub(r'"\1"', text)
+    text = regex.quote_quote.sub(r'"\1"', text)
 
     # residuals of unbalanced quotes
     text = text.replace("'''", '').replace("''", '"')
@@ -438,11 +403,11 @@ def clean(text):
 
     spans = []
     # Drop HTML comments
-    for m in regex_comment.finditer(text):
+    for m in regex.comment.finditer(text):
         spans.append((m.start(), m.end()))
 
     # Drop self-closing tags
-    for pattern in regex_self_closing_tags:
+    for pattern in regex.self_closing_tags:
         for m in pattern.finditer(text):
             spans.append((m.start(), m.end()))
 
@@ -475,10 +440,11 @@ def clean(text):
 
     # Cleanup text
     text = text.replace('\t', ' ')
-    text = regex_spaces.sub(' ', text)
-    text = regex_dots.sub('...', text)
+    text = regex.spaces.sub(' ', text)
+    text = regex.dots.sub('...', text)
     text = re.sub(u' (,:\.\)\]Â»)', r'\1', text)
     text = re.sub(u'(\[\(Â«) ', r'\1', text)
+    text = re.sub(r"（）", "", text)
     text = re.sub(
         r'\n\W+?\n', '\n', text, flags=re.U)  # lines with only punctuations
     text = text.replace(',,', ',').replace(',.', '.')
@@ -486,33 +452,17 @@ def clean(text):
 
 
 def compact(text):
-    """Deal with headers, lists, empty sections, residuals of tables.
-    :param text: convert to HTML.
-    """
-
     page = []  # list of paragraph
     headers = {}  # Headers for unfilled sections
     emptySection = False  # empty sections are discarded
     listLevel = []  # nesting of lists
 
     for line in text.split('\n'):
-
         if not line:
             continue
-        # Handle regex_section titles
-        m = regex_section.match(line)
+        # Handle regex.section titles
+        m = regex.section.match(line)
         if m:
-            title = m.group(2)
-            lev = len(m.group(1))  # header level
-            if title and title[-1] not in '!?':
-                title += '.'  # terminate sentence.
-            headers[lev] = title
-            # drop previous headers
-            for i in headers.keys():
-                if i > lev:
-                    del headers[i]
-            emptySection = True
-            listLevel = []
             continue
         # Handle page title
         elif line.startswith('++'):
@@ -642,7 +592,7 @@ def main():
     f = fileinput.FileInput(args.input, openhook=fileinput.hook_compressed)
     for line in f:
         line = line.decode("utf-8")
-        m = regex_tags.search(line)
+        m = regex.tags.search(line)
         if not m:
             continue
         tag = m.group(2)
@@ -661,14 +611,15 @@ def main():
             break
 
     for (id, title, ns, page) in pages_from(f):
-        print(id, title, page)
         if ns not in templateKeys:
             url = get_url(id)
             text = ''.join(page)
             text = clean(text)
-            print(text)
+            paragraphs = []
             for line in compact(text):
-                print(line)
+                paragraphs.append(line)
+            print(title)
+            print("".join(paragraphs))
 
 
 if __name__ == '__main__':
