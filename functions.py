@@ -5,29 +5,29 @@ import regex
 import collection
 
 self_closing_tags = [
-    re.compile(r'<\s*%s\b[^>]*/\s*>' % tag, re.DOTALL | re.IGNORECASE)
+    re.compile(r"<\s*%s\b[^>]*/\s*>" % tag, re.DOTALL | re.IGNORECASE)
     for tag in collection.tags_self_closing
 ]
 
 
 def makeInternalLink(title, label):
-    colon = title.find(':')
+    colon = title.find(":")
     if colon > 0 and title[:colon] not in collection.acceptedNamespaces:
-        return ''
+        return ""
     if colon == 0:
         # drop also :File:
-        colon2 = title.find(':', colon + 1)
+        colon2 = title.find(":", colon + 1)
         if colon2 > 1 and title[colon + 1:
                                 colon2] not in collection.acceptedNamespaces:
-            return ''
+            return ""
     return label
 
 
-def findBalanced(text, openDelim=['[['], closeDelim=[']]']):
-    openPat = '|'.join([re.escape(x) for x in openDelim])
+def findBalanced(text, openDelim=["[["], closeDelim=["]]"]):
+    openPat = "|".join([re.escape(x) for x in openDelim])
     # pattern for delimiters expected after each opening delimiter
     afterPat = {
-        o: re.compile(openPat + '|' + c, re.DOTALL)
+        o: re.compile(openPat + "|" + c, re.DOTALL)
         for o, c in zip(openDelim, closeDelim)
     }
     stack = []
@@ -61,20 +61,20 @@ def findBalanced(text, openDelim=['[['], closeDelim=[']]']):
         cur = next.end()
 
 
-def replaceInternalLinks(text):
+def replace_internal_links(text):
     cur = 0
-    res = ''
+    res = ""
     for s, e in findBalanced(text):
         m = regex.tail.match(text, e)
         if m:
             trail = m.group(0)
             end = m.end()
         else:
-            trail = ''
+            trail = ""
             end = e
         inner = text[s + 2:e - 2]
         # find first |
-        pipe = inner.find('|')
+        pipe = inner.find("|")
         if pipe < 0:
             title = inner
             label = title
@@ -83,7 +83,7 @@ def replaceInternalLinks(text):
             # find last |
             curp = pipe + 1
             for s1, e1 in findBalanced(inner):
-                last = inner.rfind('|', curp, s1)
+                last = inner.rfind("|", curp, s1)
                 if last >= 0:
                     pipe = last  # advance
                 curp = e1
@@ -93,16 +93,16 @@ def replaceInternalLinks(text):
     return res + text[cur:]
 
 
-def pages_from(input):
+def extract_pages_from_archive(input):
     page = []
     id = None
-    ns = '0'
+    ns = "0"
     last_id = None
     inText = False
     redirect = False
     for line in input:
-        line = line.decode('utf-8')
-        if '<' not in line:  # faster than doing re.search()
+        line = line.decode("utf-8")
+        if "<" not in line:  # faster than doing re.search()
             if inText:
                 page.append(line)
             continue
@@ -110,89 +110,66 @@ def pages_from(input):
         if not m:
             continue
         tag = m.group(2)
-        if tag == 'page':
+        if tag == "page":
             page = []
             redirect = False
-        elif tag == 'id' and not id:  # skip nested <id>
+        elif tag == "id" and not id:  # skip nested <id>
             id = m.group(3)
-        elif tag == 'title':
+        elif tag == "title":
             title = m.group(3)
-        elif tag == 'ns':
+        elif tag == "ns":
             ns = m.group(3)
-        elif tag == 'redirect':
+        elif tag == "redirect":
             redirect = True
-        elif tag == 'text':
+        elif tag == "text":
             inText = True
             line = line[m.start(3):m.end(3)]
             page.append(line)
             if m.lastindex == 4:  # open-close
                 inText = False
-        elif tag == '/text':
+        elif tag == "/text":
             if m.group(1):
                 page.append(m.group(1))
             inText = False
         elif inText:
             page.append(line)
-        elif tag == '/page':
+        elif tag == "/page":
             if id != last_id and not redirect:
                 yield (id, title, ns, page)
                 last_id = id
-                ns = '0'
+                ns = "0"
             id = None
             page = []
 
 
-def replaceExternalLinks(text):
-    s = ''
+def replace_external_links(text):
+    s = ""
     cur = 0
     for m in regex.link_brackets.finditer(text):
         s += text[cur:m.start()]
         cur = m.end()
-
-        url = m.group(1)
         label = m.group(3)
-
-        # # The characters '<' and '>' (which were escaped by
-        # # removeHTMLtags()) should not be included in
-        # # URLs, per RFC 2396.
-        # m2 = re.search('&(lt|gt);', url)
-        # if m2:
-        #     link = url[m2.end():] + ' ' + link
-        #     url = url[0:m2.end()]
-
-        # If the link text is an image URL, replace it with an <img> tag
-        # This happened by accident in the original parser, but some people used it extensively
         m = regex.image.match(label)
-
-        # Use the encoded URL
-        # This means that users can paste URLs directly into the text
-        # Funny characters like Ã¶ aren't valid in URLs anyway
-        # This was changed in August 2004
-        s += label  # + trail
-
+        s += label
     return s + text[cur:]
 
 
-def dropNested(text, openDelim, closeDelim):
-    """
-    A matching function for nested expressions, e.g. namespaces and tables.
-    """
-    openRE = re.compile(openDelim, re.IGNORECASE)
-    closeRE = re.compile(closeDelim, re.IGNORECASE)
-    # partition text in separate blocks { } { }
-    spans = []  # pairs (s, e) for each partition
-    nest = 0  # nesting level
-    start = openRE.search(text, 0)
+def drop_nested_tags(text, openDelim, closeDelim):
+    regex_open = re.compile(openDelim, re.IGNORECASE)
+    regex_close = re.compile(closeDelim, re.IGNORECASE)
+    spans = []
+    nest = 0
+    start = regex_open.search(text, 0)
     if not start:
         return text
-    end = closeRE.search(text, start.end())
+    end = regex_close.search(text, start.end())
     next = start
     while end:
-        next = openRE.search(text, next.end())
-        if not next:  # termination
-            while nest:  # close all pending
+        next = regex_open.search(text, next.end())
+        if not next:
+            while nest:
                 nest -= 1
-                end0 = closeRE.search(text, end.end())
+                end0 = regex_close.search(text, end.end())
                 if end0:
                     end = end0
                 else:
@@ -200,13 +177,11 @@ def dropNested(text, openDelim, closeDelim):
             spans.append((start.start(), end.end()))
             break
         while end.end() < next.start():
-            # { } {
             if nest:
                 nest -= 1
-                # try closing more
                 last = end.end()
-                end = closeRE.search(text, end.end())
-                if not end:  # unbalanced
+                end = regex_close.search(text, end.end())
+                if not end:
                     if spans:
                         span = (spans[0][0], last)
                     else:
@@ -215,23 +190,18 @@ def dropNested(text, openDelim, closeDelim):
                     break
             else:
                 spans.append((start.start(), end.end()))
-                # advance start, find next close
                 start = next
-                end = closeRE.search(text, next.end())
+                end = regex_close.search(text, next.end())
                 break  # { }
         if next != start:
             # { { }
             nest += 1
-    # collect text outside partitions
-    return dropSpans(spans, text)
+    return drop_span_tags(spans, text)
 
 
-def dropSpans(spans, text):
-    """
-    Drop from text the blocks identified in :param spans:, possibly nested.
-    """
+def drop_span_tags(spans, text):
     spans.sort()
-    res = ''
+    res = ""
     offset = 0
     for s, e in spans:
         if offset <= s:  # handle nesting
@@ -243,80 +213,60 @@ def dropSpans(spans, text):
 
 
 def compact(text):
-    page = []  # list of paragraph
-    headers = {}  # Headers for unfilled sections
-    emptySection = False  # empty sections are discarded
-    listLevel = []  # nesting of lists
+    page = []
+    headers = {}
+    emptySection = False
+    listLevel = []
 
-    for line in text.split('\n'):
+    for line in text.split("\n"):
         if not line:
             continue
-        # Handle regex.section titles
         m = regex.section.match(line)
         if m:
             continue
-        # Handle page title
-        elif line.startswith('++'):
+        elif line.startswith("++"):
             title = line[2:-2]
             if title:
-                if title[-1] not in '!?':
-                    title += '.'
+                if title[-1] not in "!?":
+                    title += "."
                 page.append(title)
-        # handle indents
-        elif line[0] == ':':
-            # page.append(line.lstrip(':*#;'))
+        elif line[0] == ":":
             continue
-        # handle lists
-        elif line[0] in '*#;:':
+        elif line[0] in "*#;:":
             i = 0
-            # c: current level char
-            # n: next level char
-            for c, n in zip_longest(listLevel, line, fillvalue=''):
-                if not n or n not in '*#;:':  # shorter or different
+            for c, n in zip_longest(listLevel, line, fillvalue=""):
+                if not n or n not in "*#;:":
                     if c:
                         listLevel = listLevel[:-1]
                         continue
                     else:
                         break
-                # n != ''
-                if c != n and (not c or (c not in ';:' and n not in ';:')):
+                if c != n and (not c or (c not in ";:" and n not in ";:")):
                     if c:
-                        # close level
                         listLevel = listLevel[:-1]
                     listLevel += n
                 i += 1
-            n = line[i - 1]  # last list char
+            n = line[i - 1]
             line = line[i:].strip()
         elif len(listLevel):
             page.append(line)
             listLevel = []
 
-        # Drop residuals of lists
-        elif line[0] in '{|' or line[-1] == '}':
+        elif line[0] in "{|" or line[-1] == "}":
             continue
-        # Drop irrelevant lines
-        elif (line[0] == '(' and line[-1] == ')') or line.strip('.-') == '':
+        elif (line[0] == "(" and line[-1] == ")") or line.strip(".-") == "":
             continue
         elif len(headers):
             headers.clear()
-            page.append(line)  # first line
+            page.append(line)
             emptySection = False
         elif not emptySection:
-            # Drop preformatted
-            if line[0] != ' ':  # dangerous
+            if line[0] != " ":
                 page.append(line)
-
     return page
 
 
 def unescape(text):
-    """
-    Removes HTML or XML character references and entities from a text string.
-
-    :param text The HTML (or XML) source text.
-    :return The plain text, as a Unicode string, if necessary.
-    """
-
     def fixup(m):
         text = m.group(0)
         code = m.group(1)
@@ -335,86 +285,55 @@ def unescape(text):
 
 
 def clean(text):
-    text = dropNested(text, r'{{', r'}}')
-
-    # Drop tables
-    text = dropNested(text, r'{\|', r'\|}')
-
-    # replace external links
-    text = replaceExternalLinks(text)
-
-    # replace internal links
-    text = replaceInternalLinks(text)
-
-    # drop MagicWords behavioral switches
-    text = regex.magicwords.sub('', text)
-    regex.magicwords
-    # ############### Process HTML ###############
-
-    # turn into HTML, except for the content of <syntaxhighlight>
-    res = ''
+    text = drop_nested_tags(text, r"{{", r"}}")
+    text = drop_nested_tags(text, r"{\|", r"\|}")
+    text = replace_external_links(text)
+    text = replace_internal_links(text)
+    text = regex.magicwords.sub("", text)
+    res = ""
     cur = 0
     for m in regex.syntaxhighlight.finditer(text):
         res += unescape(text[cur:m.start()]) + m.group(1)
         cur = m.end()
     text = res + unescape(text[cur:])
-
-    text = regex.bold_italic.sub(r'\1', text)
-    text = regex.bold.sub(r'\1', text)
+    text = regex.bold_italic.sub(r"\1", text)
+    text = regex.bold.sub(r"\1", text)
     text = regex.italic_quote.sub(r'"\1"', text)
     text = regex.italic.sub(r'"\1"', text)
     text = regex.quote_quote.sub(r'"\1"', text)
-
-    # residuals of unbalanced quotes
     text = text.replace("'''", '').replace("''", '"')
 
-    # Collect spans
-
     spans = []
-    # Drop HTML comments
     for m in regex.comment.finditer(text):
         spans.append((m.start(), m.end()))
-
-    # Drop self-closing tags
     for pattern in self_closing_tags:
         for m in pattern.finditer(text):
             spans.append((m.start(), m.end()))
-
-    # Drop ignored tags
     for left, right in collection.ignored_tag_patterns:
         for m in left.finditer(text):
             spans.append((m.start(), m.end()))
         for m in right.finditer(text):
             spans.append((m.start(), m.end()))
 
-    # Bulk remove all spans
-    text = dropSpans(spans, text)
-
-    # Drop discarded elements
+    text = drop_span_tags(spans, text)
     for tag in collection.discard_elements:
-        text = dropNested(text, r'<\s*%s\b[^>/]*>' % tag, r'<\s*/\s*%s>' % tag)
+        text = drop_nested_tags(text, r"<\s*%s\b[^>/]*>" % tag, r"<\s*/\s*%s>" % tag)
 
     text = unescape(text)
-
-    # Expand placeholders
     for pattern, placeholder in regex.placeholder_tag_patterns:
         index = 1
         for match in pattern.finditer(text):
             text = text.replace(match.group(), '%s_%d' % (placeholder, index))
             index += 1
 
-    text = text.replace('<<', u'Â«').replace('>>', u'Â»')
+    text = text.replace("<<", u"Â«").replace(">>", u"Â»")
 
-    #############################################
-
-    # Cleanup text
-    text = text.replace('\t', ' ')
-    text = regex.spaces.sub(' ', text)
-    text = regex.dots.sub('...', text)
-    text = re.sub(u' (,:\.\)\]Â»)', r'\1', text)
-    text = re.sub(u'(\[\(Â«) ', r'\1', text)
+    text = text.replace("\t", " ")
+    text = regex.spaces.sub(" ", text)
+    text = regex.dots.sub("...", text)
+    text = re.sub(u" (,:\.\)\]Â»)", r"\1", text)
+    text = re.sub(u"(\[\(Â«) ", r"\1", text)
     text = re.sub(r"（）", "", text)
-    text = re.sub(
-        r'\n\W+?\n', '\n', text, flags=re.U)  # lines with only punctuations
-    text = text.replace(',,', ',').replace(',.', '.')
+    text = re.sub(r"\n\W+?\n", "\n", text, flags=re.U)
+    text = text.replace(",,", ",").replace(",.", ".")
     return text
